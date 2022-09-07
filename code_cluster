@@ -1,0 +1,213 @@
+raw_data = pd.read_csv("Input_Mechanical_Coding.csv",header = None)
+
+print(type(raw_data.iloc[1,0]))
+print(len(raw_data.iloc[1,0]))
+
+# def cleanString(string):
+#   return string[-56:-2]
+
+# print(len(cleanString(raw_data.iloc[1,0])))
+
+list_of_coordinates = []
+count_of_ones = []
+
+def cleanString(string):
+  return string[-56:-2]
+
+def Convert(string):
+    list1=[]
+    list1[:0]=string
+    return list1
+for i in range(len(raw_data)):
+  co_ordinates = Convert(cleanString(raw_data.iloc[i, 0]))
+  #print(len(co_ordinates))
+  int_co_ordinates = [float(i) for i in co_ordinates]
+  count = sum(filter(lambda x: x >= 0, int_co_ordinates))
+  count_of_ones.append(count)
+  list_of_coordinates.append(int_co_ordinates)
+
+# str = "['000000000000000000000000000000100110010000000011010100']"
+# print (str[-56:-2])
+# print(len(str))
+# print (len(str[-56:-2]))
+print((list_of_coordinates))
+print(len(list_of_coordinates))
+
+np.random.seed(0)
+
+for k in range(3,12):
+    centroids, mean_value = kmeans(list_of_coordinates,k)
+      
+    print("Code book :\n", centroids, "\n")
+    print("Mean of Euclidean distances :", mean_value.round(4))
+    clusters, distances = vq(list_of_coordinates, centroids)
+
+    dict_of_centroids = {}
+    for i in range (0,k):
+      centroids[i] = [ele.round(3) for ele in centroids[i]]
+      dict_of_centroids[i] =  centroids[i]
+    
+    centroids_of_clusters = []
+    for i in clusters:
+      centroids_of_clusters.append(dict_of_centroids[i])
+  
+    # print("Cluster index :", clusters, "\n")
+    # print("Distance from the centroids :", distances)
+    raw_data_definations = pd.read_csv("Input_Definations.csv", encoding= 'unicode_escape',header=None)
+    # print(raw_data_definations.head)
+    raw_data_definations['String'] = raw_data
+    raw_data_definations['Count'] = count_of_ones
+    raw_data_definations['Cluster Index'] = clusters
+    #raw_data_definations['Centroid'] = centroids_of_clusters#.map(lambda x: ','.join(map(str, x)))
+    raw_data_definations['Distance From Centroid'] = distances
+
+
+    np.set_printoptions(threshold=sys.maxsize)
+    print(raw_data_definations.head)
+    K_str = (f"{k}")
+    raw_data_definations.to_csv('clustersforK'+K_str+'.csv')
+    files.download('clustersforK'+K_str+'.csv')
+
+from seaborn.widgets import color_palette
+import seaborn as sns
+def minDistance(word1: str, word2: str):
+    m, n = len(word1), len(word2)
+
+    dp, dpPrev = [-1] * (n + 1), [-1] * (n + 1)
+
+    for i in range(m + 1):
+        for j in range(n + 1):
+            if i == 0:
+                dp[j] = j
+            elif j == 0:
+                dp[j] = i
+            elif word1[i - 1] == word2[j - 1]:
+                dp[j] = dpPrev[j - 1]
+            else:
+                dp[j] = min(dpPrev[j], dp[j - 1], dpPrev[j - 1]) + 1
+
+        dp, dpPrev = dpPrev, dp
+
+    return dpPrev[n]
+
+for k in range(4,12):
+    k_str =str(k)
+    file = open('clustersforK3.csv')
+
+    csvreader = csv.reader(file)
+
+    rows = {}
+
+    header =  next(csvreader,None)
+
+    for row in csvreader:
+      try:
+        rows[row[4]].append(row[2])
+      except KeyError:
+        rows[row[4]] = [row[2]]
+
+    length_key = [len(rows[key]) for key in rows.keys()]
+    print(length_key)
+    file.close()
+
+
+    result = []
+    statsCalculationOfResult = []
+    headersForStats = ["string","cluster_index" ,"length", "min", "Q1", "mean", "Q2", "Max","Median"]
+    headers = []
+    headers.append("")
+
+
+    for key in rows.keys():
+        subsetOfRow = rows[key]
+        plt.figure(figsize=(12,7))
+        dataForBoxplot = pd.DataFrame([])
+
+        for i in range(len(subsetOfRow)):
+            headers.append(str(subsetOfRow[i]))
+
+        for i in range(len(subsetOfRow)):
+            rowResult = []
+            forStatsCalculationOfResult = []
+            rowResult.append(str(subsetOfRow[i]))
+            for j in range(len(subsetOfRow)):
+                rowResult.append(minDistance(str(subsetOfRow[i]), str(subsetOfRow[j])))
+                if j != i:
+                    forStatsCalculationOfResult.append(minDistance(str(subsetOfRow[i]), str(subsetOfRow[j])))
+            result.append(rowResult)
+            statOfResults = [subsetOfRow[i], key, len(forStatsCalculationOfResult), min(forStatsCalculationOfResult), np.quantile(forStatsCalculationOfResult, 0.25),
+                            mean(forStatsCalculationOfResult), np.quantile(forStatsCalculationOfResult, 0.75),
+                            max(forStatsCalculationOfResult), median(forStatsCalculationOfResult)]
+                    
+            dataForBoxplot[i]= forStatsCalculationOfResult
+            statsCalculationOfResult.append(statOfResults)
+        #BoxPlot
+        plt.title('K = '+K_str+' :: Cluster Index = '+str(key))
+        plt.xlabel('Definations',fontsize=8)
+        plt.xticks(rotation=90)
+        sns.boxplot(x="variable", y="value", data=pd.melt(dataForBoxplot))
+        plt.savefig('K = '+K_str+' :: Cluster Index = '+str(key)+'.png')
+
+        print(key)
+        print(result)
+        print(statsCalculationOfResult)
+
+    # outputFile = 'SimilarityMatrix_output'+K_str+'.csv'
+
+    # with open(outputFile, 'w', newline="") as file:
+    #     csvwriter = csv.writer(file)
+    #     csvwriter.writerow(headers)
+    #     csvwriter.writerows(result)
+
+    outputFileWithStats = 'Stats_of_SimilarityMatrix_output'+K_str+'.csv'
+    with open(outputFileWithStats, 'w', newline="") as fileStats:
+        csvwriterForStats = csv.writer(fileStats)
+        csvwriterForStats.writerow(headersForStats)
+        csvwriterForStats.writerows(statsCalculationOfResult)
+
+    colorPalette = ['#008080','#ff0000','#ffd700','#00ffff','#0000ff',
+                    '#800080','#ffa500','#800000','#00ff00','#ff00ff','#101010']
+
+    dataForScatterplot = pd.DataFrame(statsCalculationOfResult, columns=headersForStats)
+    dataForScatterplot['Index'] = dataForScatterplot.index.values.tolist()
+
+    print(dataForScatterplot.columns)
+    # # plt.scatter(x = dataForScatterplot['string'], y = dataForScatterplot['mean'], s=5, linewidth=0)
+    colorPalette = ['#008080','#ff0000','#ffd700','#00ffff','#0000ff',
+                    '#800080','#ffa500','#800000','#00ff00','#ff00ff','#101010']
+
+    sns.set(rc={'figure.figsize':(15,6)})
+    ax = dataForScatterplot[dataForScatterplot['cluster_index']==str(0)].plot(x = 'Index', y = 'mean', color=colorPalette[0], label="Title 0", kind='scatter')
+    for key in range(1,k+1): 
+      dataForScatterplot[dataForScatterplot['cluster_index']==str(key)].plot(x = 'Index', y = 'mean', color=colorPalette[key], label=("Title "+str(key)), kind='scatter', ax=ax)
+    ax.set_xticks(np.arange(1, 71, 1))
+    plt.xticks(rotation=90)
+    # plt.axvspan(35.5, 35.5, color='red', alpha=0.5)
+    # plt.axvspan((35.5+16), (35.5+16), color='red', alpha=0.5)
+    # for i in length_key:
+    #   plt.axvspan(i, i, color='red', alpha=0.5)
+    plt.savefig('Scatterplot_for_average_similarity'+K_str+'.png')
+
+from pickle import TRUE
+dataForScatterplot = pd.DataFrame(statsCalculationOfResult, columns=headersForStats)
+dataForScatterplot['Index'] = dataForScatterplot.index.values.tolist()
+
+print(dataForScatterplot.columns)
+# # plt.scatter(x = dataForScatterplot['string'], y = dataForScatterplot['mean'], s=5, linewidth=0)
+colorPalette = ['#008080','#ff0000','#ffd700','#00ffff','#0000ff',
+                '#800080','#ffa500','#800000','#00ff00','#ff00ff','#101010']
+
+
+sns.set(rc={'figure.figsize':(15,6)})
+ax = dataForScatterplot[dataForScatterplot['cluster_index']==str(0)].plot(x = 'Index', y = 'mean', color=colorPalette[0], label="Title 0", kind='scatter')
+for key in range(1,k+1): 
+  dataForScatterplot[dataForScatterplot['cluster_index']==str(key)].plot(x = 'Index', y = 'mean', color=colorPalette[key], label=("Title "+str(key)), kind='scatter', ax=ax)
+ax.set_xticks(np.arange(1, 71, 1))
+plt.xticks(rotation=90)
+# plt.axvspan(35.5, 35.5, color='red', alpha=0.5)
+# plt.axvspan((35.5+16), (35.5+16), color='red', alpha=0.5)
+# for i in length_key:
+#   plt.axvspan(i, i, color='red', alpha=0.5)
+plt.savefig("jhdskf.png")
+
+dataForScatterplot.index.values.tolist()
